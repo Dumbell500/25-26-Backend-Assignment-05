@@ -1,6 +1,5 @@
 package com.gdg.jwtexample.service;
 
-import com.gdg.jwtexample.domain.AuthProvider;
 import com.gdg.jwtexample.domain.RefreshToken;
 import com.gdg.jwtexample.domain.User;
 import com.gdg.jwtexample.domain.UserRole;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class AuthService {
 
     private final UserRepository userRepository;
@@ -35,7 +33,8 @@ public class AuthService {
         this.encoder = encoder;
     }
 
-    // 회원가입 (LOCAL)
+    // 회원가입 - 쓰기 트랜잭션
+    @Transactional
     public void signup(SignupRequest req) {
         if (userRepository.existsByEmail(req.email())) {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");
@@ -45,29 +44,29 @@ public class AuthService {
                 .email(req.email())
                 .password(encoder.encode(req.password()))
                 .role(UserRole.ROLE_USER)
-                .provider(AuthProvider.LOCAL)
-                .providerId(null)
-                .name(req.email()) // 별도 닉네임 없으니 이메일을 이름으로 사용
                 .build();
 
         userRepository.save(user);
     }
 
-    // 로그인 + 토큰 발급 (LOCAL)
+    // 로그인 + 토큰 발급 - 쓰기 트랜잭션
+    @Transactional
     public TokenResponse login(LoginRequest req) {
-        User user = userRepository.findByEmailAndProvider(req.email(), AuthProvider.LOCAL)
+        User user = userRepository.findByEmail(req.email())
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다."));
 
         if (!encoder.matches(req.password(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
+        // Access / Refresh 토큰 발급
         String access = tokenProvider.createAccessToken(user.getEmail(), user.getRole());
         String refresh = tokenProvider.createRefreshToken(user.getEmail());
 
         long refreshExpireMillis = tokenProvider.getRefreshValidityMs();
         Instant refreshExpireAt = Instant.now().plusMillis(refreshExpireMillis);
 
+        // 기존 리프레시 토큰 있으면 삭제 후 새 토큰 저장
         refreshTokenRepository.findByUser(user)
                 .ifPresent(refreshTokenRepository::delete);
 
@@ -78,7 +77,8 @@ public class AuthService {
         return new TokenResponse(access, refresh);
     }
 
-    // 리프레시 토큰 재발급
+    // 리프레시 토큰 재발급 - 쓰기 트랜잭션
+    @Transactional
     public TokenResponse reissue(String refreshToken) {
         if (!tokenProvider.isValid(refreshToken)) {
             throw new IllegalArgumentException("리프레시 토큰이 유효하지 않습니다.");
@@ -96,12 +96,14 @@ public class AuthService {
             throw new IllegalArgumentException("리프레시 토큰이 일치하지 않습니다.");
         }
 
+        // 새 토큰 발급
         String newAccess = tokenProvider.createAccessToken(user.getEmail(), user.getRole());
         String newRefresh = tokenProvider.createRefreshToken(user.getEmail());
 
         long refreshExpireMillis = tokenProvider.getRefreshValidityMs();
         Instant newRefreshExpireAt = Instant.now().plusMillis(refreshExpireMillis);
 
+        // 기존 엔티티에 새 토큰/만료시간 반영
         saved.rotate(newRefresh, newRefreshExpireAt);
 
         return new TokenResponse(newAccess, newRefresh);
