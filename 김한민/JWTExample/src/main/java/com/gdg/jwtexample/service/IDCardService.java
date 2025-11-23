@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@Transactional
 public class IDCardService {
 
     private final IDCardRepository idCardRepository;
@@ -32,7 +31,7 @@ public class IDCardService {
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다."));
     }
 
-    /**  읽기 전용 (성능 최적화 가능) */
+    /** 읽기 전용 (트랜잭션 readOnly = true) */
     @Transactional(readOnly = true)
     public List<IDCardResponse> list(Principal principal) {
         User user = currentUser(principal.getName());
@@ -41,7 +40,7 @@ public class IDCardService {
                 .collect(Collectors.toList());
     }
 
-    /** 저장(쓰기 트랜잭션 필요) */
+    /** 저장(쓰기 트랜잭션) */
     @Transactional
     public IDCardResponse save(Principal principal, IDCardSaveRequest req) {
         User user = currentUser(principal.getName());
@@ -56,7 +55,7 @@ public class IDCardService {
         return IDCardResponse.from(card);
     }
 
-    /** 수정(쓰기 트랜잭션 필요) */
+    /** 수정(쓰기 트랜잭션) */
     @Transactional
     public IDCardResponse update(Principal principal, Long id, IDCardUpdateRequest req) {
         User user = currentUser(principal.getName());
@@ -67,7 +66,7 @@ public class IDCardService {
         return IDCardResponse.from(card);
     }
 
-    /** 삭제(쓰기 트랜잭션 필요) */
+    /** 삭제(쓰기 트랜잭션) */
     @Transactional
     public void delete(Principal principal, Long id) {
         User user = currentUser(principal.getName());
