@@ -1,6 +1,0 @@
-package com.gdg.jwtexample.domain;
-
-public enum Role {
-    ROLE_USER,
-    ROLE_ADMIN
-}
