@@ -41,10 +41,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         // 1) providerId 로 먼저 조회
         User user = userRepository.findByProviderId(providerId)
-                .orElseGet(() ->
-                        // 2) 없으면 새로 생성
-                        createGoogleUser(providerId, email, name)
-                );
+                .orElseGet(() -> createGoogleUser(providerId, email, name));
 
         List<? extends GrantedAuthority> authorities =
                 List.of(new SimpleGrantedAuthority(user.getRole().name()));
@@ -56,7 +53,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     private User createGoogleUser(String providerId, String email, String name) {
         User user = User.builder()
                 .email(email)
-                .password("GOOGLE_USER") // 실제 로그인에는 사용되지 않는 더미 값
+                .password(null)              // 더미 패스워드 제거, 소셜 계정은 패스워드 사용 안 함
                 .role(UserRole.ROLE_USER)
                 .provider(AuthProvider.GOOGLE)
                 .providerId(providerId)

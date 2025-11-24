@@ -1,5 +1,6 @@
 package com.gdg.jwtexample.service;
 
+import com.gdg.jwtexample.domain.AuthProvider;
 import com.gdg.jwtexample.domain.RefreshToken;
 import com.gdg.jwtexample.domain.User;
 import com.gdg.jwtexample.domain.UserRole;
@@ -33,7 +34,7 @@ public class AuthService {
         this.encoder = encoder;
     }
 
-    // 회원가입 - 쓰기 트랜잭션
+    // 회원가입 - LOCAL 전용 (쓰기 트랜잭션)
     @Transactional
     public void signup(SignupRequest req) {
         if (userRepository.existsByEmail(req.email())) {
@@ -44,17 +45,26 @@ public class AuthService {
                 .email(req.email())
                 .password(encoder.encode(req.password()))
                 .role(UserRole.ROLE_USER)
+                .provider(AuthProvider.LOCAL)
+                .providerId(null)          // 로컬 계정은 providerId 없음
+                .name(req.email())         // 일단 이메일 기반으로 이름 세팅(원하면 별도 필드 추가)
                 .build();
 
         userRepository.save(user);
     }
 
-    // 로그인 + 토큰 발급 - 쓰기 트랜잭션
+    // 로그인 + 토큰 발급 - LOCAL 전용 (쓰기 트랜잭션)
     @Transactional
     public TokenResponse login(LoginRequest req) {
         User user = userRepository.findByEmail(req.email())
                 .orElseThrow(() -> new NoSuchElementException("사용자를 찾을 수 없습니다."));
 
+        // 1) 소셜 계정은 여기서 로그인 막기
+        if (user.getProvider() != AuthProvider.LOCAL) {
+            throw new IllegalArgumentException("소셜 로그인 계정입니다. 구글 로그인을 이용해주세요.");
+        }
+
+        // 2) 비밀번호 검증
         if (!encoder.matches(req.password(), user.getPassword())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
@@ -77,7 +87,7 @@ public class AuthService {
         return new TokenResponse(access, refresh);
     }
 
-    // 리프레시 토큰 재발급 - 쓰기 트랜잭션
+    // 리프레시 토큰 재발급 - 공통 (쓰기 트랜잭션)
     @Transactional
     public TokenResponse reissue(String refreshToken) {
         if (!tokenProvider.isValid(refreshToken)) {

@@ -27,7 +27,8 @@ public class User {
     @Column(nullable = false, unique = true, length = 120)
     private String email;
 
-    @Column(nullable = false, length = 200)
+    // LOCAL 계정만 사용, 소셜 계정은 null 허용
+    @Column(length = 200)
     private String password;
 
     @Enumerated(EnumType.STRING)
